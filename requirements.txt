@@ -1,0 +1,15 @@
+sktime
+pmdarima
+pandas
+openpyxl
+matplotlib
+seaborn
+plotly
+prophet
+statsmodels
+streamlit
+geopandas
+folium
+streamlit-option-menu
+pingouin
+jupyterlab
