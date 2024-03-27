@@ -56,7 +56,7 @@ def carnoclean(car):
 def service_name(service):  
     name = re.sub('\([^)]*\)', '', service[0])
     if name != '-':       
-        return name
+        return name.replace('-', '')
     else:
         if service[1] == 'keybox':
             return '카셰어링프리미엄'
@@ -112,10 +112,12 @@ if customer_file is not None:
     customer_bill_name = customer_bill.iloc[0,2]  #청구서용 법인명 불러오기
     customer_code = customer_bill.iloc[0,9]    #사업자번호 불러오기
     customer_account = customer_bill.iloc[0,17] #계좌번호 불러오기
+    bill_month = customer_bill.iloc[0,26]
 
-    st.write('청구고객사명:',customer_name, ', 사업자등록번호:',customer_code, ', 계좌번호:',customer_account)
+    st.write('청구고객사명:',customer_name, ', 사업자등록번호:',customer_code, ', 계좌번호:',customer_account, ', 청구기준:', bill_month)
       # 청구기준일, 해당월 종료일, 해당월 날짜기간
     start_date = st.date_input('##### 청구기준일자 입력 #####', value=None)
+    bill_date = st.date_input('##### 청구서 작성일 입력 #####', datetime.now())
     st.write('청구기준일:', start_date)
     if start_date is not None:
         end_date = (start_date + relativedelta(months=1)- timedelta(days=1)).strftime('%Y-%m-%d')
@@ -145,12 +147,11 @@ if customer_file is not None:
 
       #CMS 데이터 기준 서비스 미사용 차량 조회 (월별로 사전에 생성)
       cms_raw = pd.read_excel(f"cms_off_list_({year_month}).xlsx")
-
       car_off = cms_raw.loc[cms_raw['고객사'] == customer_name]
       car_off['종료일'] = car_off['종료일자'].dt.strftime("%Y-%m-%d")
       #청구 고객사 정보와 차량 매칭
       car_off_merge = pd.merge(car_off, customer_bill, left_on='고객사', right_on='CMS고객사명', how='left')
-      columns = ['차량번호','모델','서비스명1', '단가1', '종료일']
+      columns = ['차량번호(clean)','모델','서비스명1', '단가1', '종료일']
       car_off_list = car_off_merge[columns]
       #종료 차량 조회
       st.write('##### 종료차량 조회 #####')
@@ -164,6 +165,7 @@ if customer_file is not None:
       # customer_car['장착일'] = customer_car['장착일'].dt.strptime("%Y-%m-%d")
       # time = datetime.time(hour=0, minute=0, second=0)
       s_date = pd.Timestamp(start_date)
+      start_date_str = start_date.strftime('%Y-%m-%d')
       customer_car['이용시작'] = customer_car['장착일'].apply(service_start, s_date =s_date)
       customer_car['이용시작'] = customer_car['이용시작'].dt.strftime("%Y-%m-%d")
           # 말일 날짜 계산 (1개월 더해서 1일 빼기)
@@ -175,7 +177,7 @@ if customer_file is not None:
       # 종료차량 청구대상에 추가하기
       append_data = list(dataframe_to_rows(car_off_list, index=False, header=False))
       for r_idx, row in enumerate(append_data):
-          customer_car.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', start_date, row[4]]
+          customer_car.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', start_date_str, row[4]]
 
       #청구대상 기산 산정
       customer_car['start']=pd.to_datetime(customer_car['이용시작'])
@@ -209,7 +211,7 @@ if customer_file is not None:
       print(ws1['I23'].value)
       ws1['B4'].value = customer_bill_name  #고객사명
       ws1['B6'].value = f'{month}월 이용대금 청구서'
-      ws1['O1'].value = '2024-03-08'  #청구서작성일자
+      ws1['O1'].value = bill_date  #청구서작성일자
       ws1['I23'].value = customer_account   #계좌번호
       st.write(customer_account)
 
@@ -235,7 +237,6 @@ if customer_file is not None:
                 cell.alignment = Alignment(horizontal='center', vertical='center')
       
       write_dataframe_to_excel(car_sort, row-1, 6, 2)
-      st.write('목록 만들기')
       for i in range(6, 6+row):
         ws2['I'+str(i)].alignment = Alignment(horizontal='right', vertical='center')
         ws2['J'+str(i)] = "=round(I"+str(i)+"*0.1,0)"
