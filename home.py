@@ -217,8 +217,9 @@ if customer_file is not None:
         #청구내역서 엑셀 저장하기
         # if st.button('청구내역서 만들기'):
     #   st.write('청구내역서 만들기')
-
-        wb = openpyxl.load_workbook("기본청구양식.xlsx")
+        uploaded_file = st.file_uploader("Choose a file")
+        wb = openpyxl.load_workbook(uploaded_file)
+        # wb = openpyxl.load_workbook("기본청구양식.xlsx")
         # 청구서 표지 만들기
         #   st.write('청구표지 만들기')
         ws1 = wb['청구서']
