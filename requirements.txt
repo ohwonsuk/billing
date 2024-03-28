@@ -1,7 +1,8 @@
+openpyxl==3.1.2
 sktime
 pmdarima
 pandas
-openpyxl
+# openpyxl
 matplotlib
 seaborn
 plotly
