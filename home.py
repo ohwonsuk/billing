@@ -218,7 +218,7 @@ if customer_file is not None:
         # if st.button('청구내역서 만들기'):
     #   st.write('청구내역서 만들기')
 
-        wb = openpyxl.load_workbook("기본청구양식.xlsx")
+        wb = load_workbook("기본청구양식.xlsx", read_only=False)
         # 청구서 표지 만들기
         #   st.write('청구표지 만들기')
         ws1 = wb['청구서']
