@@ -217,60 +217,58 @@ if customer_file is not None:
         #청구내역서 엑셀 저장하기
         # if st.button('청구내역서 만들기'):
     #   st.write('청구내역서 만들기')
-        uploaded_file = st.file_uploader("Choose a file")
-        if uploaded_file is not None:
-            wb = openpyxl.load_workbook(uploaded_file)
-            # wb = openpyxl.load_workbook("기본청구양식.xlsx")
-            # 청구서 표지 만들기
-            #   st.write('청구표지 만들기')
-            ws1 = wb['청구서']
-            print(ws1['E15'].value)
-            print(ws1['G15'].value)
-            print(ws1['I23'].value)
-            ws1['B4'].value = customer_bill_name  #고객사명
-            ws1['B6'].value = f'{month}월 이용대금 청구서'
-            ws1['O1'].value = bill_date  #청구서작성일자
-            ws1['I23'].value = customer_account   #계좌번호
-            #   st.write(customer_account)
 
-            # 이용료 내역 만들기
-            ws2 = wb['이용료']
-            ws2['B2'].value = f'{year}년 {month}월' 
-            ws2['B4'].value = customer_code      #사업자등록번호
-            ws2['C4'].value = customer_bill_name  #고객사명
-            # 스타일 지정
-            border = openpyxl.styles.Border(left=openpyxl.styles.Side(style='thin'), 
-                                            right=openpyxl.styles.Side(style='thin'), 
-                                            top=openpyxl.styles.Side(style='thin'), 
-                                            bottom=openpyxl.styles.Side(style='thin'))
-            font = openpyxl.styles.Font(name='맑은고딕', size=9)
+        wb = openpyxl.load_workbook("기본청구양식.xlsx")
+        # 청구서 표지 만들기
+        #   st.write('청구표지 만들기')
+        ws1 = wb['청구서']
+        print(ws1['E15'].value)
+        print(ws1['G15'].value)
+        print(ws1['I23'].value)
+        ws1['B4'].value = customer_bill_name  #고객사명
+        ws1['B6'].value = f'{month}월 이용대금 청구서'
+        ws1['O1'].value = bill_date  #청구서작성일자
+        ws1['I23'].value = customer_account   #계좌번호
+        #   st.write(customer_account)
 
-            def write_dataframe_to_excel(df, row, start_row, start_col):
-                rows = list(dataframe_to_rows(df, index=False, header=False))
-                for r_idx, row in enumerate(rows, start_row):
-                    for c_idx, value in enumerate(row, start_col):
-                        cell = wb['이용료'].cell(row = r_idx, column = c_idx, value = value)
-                        cell.border = border
-                        cell.font = font
-                        cell.alignment = Alignment(horizontal='center', vertical='center')
-            
-            write_dataframe_to_excel(car_sort, row-1, 6, 2)
-            for i in range(6, 6+row):
-                ws2['I'+str(i)].alignment = Alignment(horizontal='right', vertical='center')
-                ws2['J'+str(i)] = "=round(I"+str(i)+"*0.1,0)"
-                ws2['J'+str(i)].number_format = '#,##0'
-                ws2['J'+str(i)].border = border
-                ws2['J'+str(i)].font = font
-                ws2['K'+str(i)] = "=I"+str(i)+"+J"+str(i)
-                ws2['K'+str(i)].number_format = '#,##0'
-                ws2['K'+str(i)].border = border
-                ws2['K'+str(i)].font = font
-                ws2['L'+str(i)].border = border
-                ws2['M'+str(i)].border = border
-                ws2['I'+str(i)].number_format = '#,##0'
+        # 이용료 내역 만들기
+        ws2 = wb['이용료']
+        ws2['B2'].value = f'{year}년 {month}월' 
+        ws2['B4'].value = customer_code      #사업자등록번호
+        ws2['C4'].value = customer_bill_name  #고객사명
+        # 스타일 지정
+        border = openpyxl.styles.Border(left=openpyxl.styles.Side(style='thin'), 
+                                        right=openpyxl.styles.Side(style='thin'), 
+                                        top=openpyxl.styles.Side(style='thin'), 
+                                        bottom=openpyxl.styles.Side(style='thin'))
+        font = openpyxl.styles.Font(name='맑은고딕', size=9)
 
-            wb.save(f'{customer_name}_{month}월_스마트링크내역서.xlsx')
-            st.write('청구내역서 생성완료')
+        def write_dataframe_to_excel(df, row, start_row, start_col):
+            rows = list(dataframe_to_rows(df, index=False, header=False))
+            for r_idx, row in enumerate(rows, start_row):
+                for c_idx, value in enumerate(row, start_col):
+                    cell = wb['이용료'].cell(row = r_idx, column = c_idx, value = value)
+                    cell.border = border
+                    cell.font = font
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        write_dataframe_to_excel(car_sort, row-1, 6, 2)
+        for i in range(6, 6+row):
+            ws2['I'+str(i)].alignment = Alignment(horizontal='right', vertical='center')
+            ws2['J'+str(i)] = "=round(I"+str(i)+"*0.1,0)"
+            ws2['J'+str(i)].number_format = '#,##0'
+            ws2['J'+str(i)].border = border
+            ws2['J'+str(i)].font = font
+            ws2['K'+str(i)] = "=I"+str(i)+"+J"+str(i)
+            ws2['K'+str(i)].number_format = '#,##0'
+            ws2['K'+str(i)].border = border
+            ws2['K'+str(i)].font = font
+            ws2['L'+str(i)].border = border
+            ws2['M'+str(i)].border = border
+            ws2['I'+str(i)].number_format = '#,##0'
+
+        wb.save(f'{customer_name}_{month}월_스마트링크내역서.xlsx')
+        st.write('청구내역서 생성완료')
 
 else:
     st.warning('엑셀파일을 업로드 하세요')
