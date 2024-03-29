@@ -18,7 +18,7 @@ warnings.filterwarnings(action='ignore')  #경로 무시, 다시 적용시 defau
 
 st.title('스마트링크 청구내역서 관리')
 st.header('월간청구내역서 생성')
-st.write(os.path.dirname(__file__))
+st.write(os.path.realpath(__file__))
 
 
 
@@ -223,7 +223,7 @@ if customer_file is not None:
         #청구내역서 엑셀 저장하기
         # if st.button('청구내역서 만들기'):
     #   st.write('청구내역서 만들기')
-        path = os.path.dirname(__file__)
+        path = os.path.realpath(__file__)
         wb = (load_workbook('/mount/src/billing/기본청구양식.xlsx') if card_use != 'Y' else load_workbook('/mount/src/billing/카드청구양식.xlsx'))
         # 청구서 표지 만들기
         #   st.write('청구표지 만들기')
