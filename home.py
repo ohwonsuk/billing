@@ -224,7 +224,7 @@ if customer_file is not None:
         # if st.button('청구내역서 만들기'):
     #   st.write('청구내역서 만들기')
         path = os.path.dirname(__file__)
-        wb = (load_workbook(f'{path}/기본청구양식.xlsx') if card_use != 'Y' else load_workbook(f'{path}/카드청구양식.xlsx'))
+        wb = (load_workbook('/mount/src/billing/기본청구양식.xlsx') if card_use != 'Y' else load_workbook('/mount/src/billing/카드청구양식.xlsx'))
         # 청구서 표지 만들기
         #   st.write('청구표지 만들기')
         ws1 = wb['청구서']
@@ -285,7 +285,7 @@ if customer_file is not None:
             ws2['M'+str(i)].border = border
             ws2['I'+str(i)].number_format = '#,##0'
 
-        wb.save(f'{path}\{customer_name}_{month}월_스마트링크내역서.xlsx')
+        wb.save('/mount/src/billing/{customer_name}_{month}월_스마트링크내역서.xlsx')
         st.write('청구내역서 생성완료')
 
 else:
