@@ -20,6 +20,8 @@ st.title('스마트링크 청구내역서 관리')
 st.header('월간청구내역서 생성')
 st.write(os.path.dirname(__file__))
 
+
+
 # 차량번호 cleansing 함수
 def carnoclean(car):
     carno = re.sub('\([^)]*\)', '', car)    
@@ -221,8 +223,8 @@ if customer_file is not None:
         #청구내역서 엑셀 저장하기
         # if st.button('청구내역서 만들기'):
     #   st.write('청구내역서 만들기')
-
-        wb = (load_workbook("기본청구양식.xlsx") if card_use != 'Y' else load_workbook("카드청구양식.xlsx"))
+        path = os.path.dirname(__file__)
+        wb = (load_workbook(f'{path}\기본청구양식.xlsx') if card_use != 'Y' else load_workbook(f'{path}\카드청구양식.xlsx'))
         # 청구서 표지 만들기
         #   st.write('청구표지 만들기')
         ws1 = wb['청구서']
@@ -283,7 +285,7 @@ if customer_file is not None:
             ws2['M'+str(i)].border = border
             ws2['I'+str(i)].number_format = '#,##0'
 
-        wb.save(f'{customer_name}_{month}월_스마트링크내역서.xlsx')
+        wb.save(f'{path}\{customer_name}_{month}월_스마트링크내역서.xlsx')
         st.write('청구내역서 생성완료')
 
 else:
