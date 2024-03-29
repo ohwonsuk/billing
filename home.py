@@ -12,11 +12,13 @@ from openpyxl.styles import Alignment
 from dateutil.parser import parse #텍스트날짜를 날짜 형식으로 변경
 import warnings
 import re
+import os
 
 warnings.filterwarnings(action='ignore')  #경로 무시, 다시 적용시 default
 
 st.title('스마트링크 청구내역서 관리')
 st.header('월간청구내역서 생성')
+st.write(os.path.dirname(__file__))
 
 # 차량번호 cleansing 함수
 def carnoclean(car):
@@ -105,8 +107,9 @@ if customer_file is not None:
     customer_raw.loc[customer_raw['주유'].str.contains('Y', na=False), '카드'] = 'Y'
     customer_raw.loc[customer_raw['하이패스'].str.contains('Y', na=False), '카드'] = 'Y'
     customer_raw['카드'] = customer_raw['카드'].fillna('N')
-    customer_list = customer_raw[(customer_raw['계좌번호'].notnull()) & (customer_raw['청구고객사'] != 'Y') ]
+    customer_list = customer_raw[customer_raw['계좌번호'].notnull() ]
     customer_list['CMS고객사명'] = customer_list['CMS고객사명'].str.replace('㈜','(주)')
+    customer_list['CMS고객사명'] = customer_list['CMS고객사명'].str.replace(' ','')
     customer_count = customer_list['법인명'].count()
 
     st.write('직접청구 및 청구계좌번호 존재하는 고객사 대상')
@@ -124,6 +127,7 @@ if customer_file is not None:
     customer_bill_name = customer_bill.iloc[0,2]  #청구서용 법인명 불러오기
     customer_code = customer_bill.iloc[0,9]    #사업자번호 불러오기
     customer_account = customer_bill.iloc[0,17] #계좌번호 불러오기
+    card_use = customer_bill.iloc[0,28]   #하나카드 사용여부
     bill_month = customer_bill.iloc[0,26]
             # 고객사 서비스별 단가 매칭 
     company_data = list(dataframe_to_rows(customer_bill, index=False, header=False))
@@ -131,7 +135,7 @@ if customer_file is not None:
     price2 = company_data[0][21]  # 카셰어링프리미엄
     print('이용료',company_data)
 
-    st.write('청구고객사명:',customer_name, ', 사업자등록번호:',customer_code, ', 계좌번호:',customer_account, ', 청구기준:', bill_month)
+    st.write('청구고객사명:',customer_name, ', 사업자등록번호:',customer_code, ', 계좌번호:',customer_account, ', 청구기준:', bill_month, ', 하나카드사용:', card_use)
     # 청구기준일, 해당월 종료일, 해당월 날짜기간
     start_date = st.date_input('##### 청구기준일자 입력 #####', value=None)
     bill_date = st.date_input('##### 청구서 작성일 입력 #####', datetime.now())
@@ -218,7 +222,7 @@ if customer_file is not None:
         # if st.button('청구내역서 만들기'):
     #   st.write('청구내역서 만들기')
 
-        wb = load_workbook("기본청구양식.xlsx", read_only=False)
+        wb = (load_workbook("기본청구양식.xlsx") if card_use != 'Y' else load_workbook("카드청구양식.xlsx"))
         # 청구서 표지 만들기
         #   st.write('청구표지 만들기')
         ws1 = wb['청구서']
@@ -228,7 +232,11 @@ if customer_file is not None:
         ws1['B4'].value = customer_bill_name  #고객사명
         ws1['B6'].value = f'{month}월 이용대금 청구서'
         ws1['O1'].value = bill_date  #청구서작성일자
-        ws1['I23'].value = customer_account   #계좌번호
+        if card_use == 'N':
+            ws1['I23'].value = customer_account   #계좌번호
+        else:
+            ws1['I31'].value = customer_account   #계좌번호
+        # ws1['I23'].value = customer_account   #계좌번호
         #   st.write(customer_account)
 
         # 이용료 내역 만들기
@@ -236,6 +244,14 @@ if customer_file is not None:
         ws2['B2'].value = f'{year}년 {month}월' 
         ws2['B4'].value = customer_code      #사업자등록번호
         ws2['C4'].value = customer_bill_name  #고객사명
+        # 카드상세 내역 만들기
+        if card_use == 'Y':
+            ws3 = wb['카드상세내역']
+            if month != 1:
+                ws3['B2'].value = f'{year}년 {month-1}월' 
+            else:
+                ws3['B2'].value = f'{year-1}년 {month+11}월' 
+
         # 스타일 지정
         border = openpyxl.styles.Border(left=openpyxl.styles.Side(style='thin'), 
                                         right=openpyxl.styles.Side(style='thin'), 
