@@ -1,16 +1,5 @@
-openpyxl==3.1.2
-sktime
-pmdarima
 pandas
-# openpyxl
-matplotlib
-seaborn
-plotly
-prophet
-statsmodels
+openpyxl
 streamlit
-geopandas
-folium
 streamlit-option-menu
-pingouin
-jupyterlab
+streamlit-lottie

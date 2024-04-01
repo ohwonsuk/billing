@@ -18,7 +18,7 @@ warnings.filterwarnings(action='ignore')  #경로 무시, 다시 적용시 defau
 
 st.title('스마트링크 청구내역서 관리')
 st.header('월간청구내역서 생성')
-st.write(os.path.realpath(__file__))
+# st.write(os.path.realpath(__file__))
 
 
 
@@ -224,20 +224,20 @@ if customer_file is not None:
         # if st.button('청구내역서 만들기'):
     #   st.write('청구내역서 만들기')
         path = os.path.realpath(__file__)
-        wb = (load_workbook('/mount/src/billing/기본청구양식.xlsx') if card_use != 'Y' else load_workbook('/mount/src/billing/카드청구양식.xlsx'))
+        wb = (load_workbook('basic-form.xlsx') if card_use != 'Y' else load_workbook('card-form.xlsx'))
         # 청구서 표지 만들기
         #   st.write('청구표지 만들기')
         ws1 = wb['청구서']
-        print(ws1['E15'].value)
-        print(ws1['G15'].value)
-        print(ws1['I23'].value)
+        # print(ws1['E15'].value)
+        # print(ws1['G15'].value)
+        # print(ws1['I23'].value)
         ws1['B4'].value = customer_bill_name  #고객사명
         ws1['B6'].value = f'{month}월 이용대금 청구서'
         ws1['O1'].value = bill_date  #청구서작성일자
         if card_use == 'N':
             ws1['I23'].value = customer_account   #계좌번호
         else:
-            ws1['I31'].value = customer_account   #계좌번호
+            ws1['I29'].value = customer_account   #계좌번호
         # ws1['I23'].value = customer_account   #계좌번호
         #   st.write(customer_account)
 
@@ -285,7 +285,7 @@ if customer_file is not None:
             ws2['M'+str(i)].border = border
             ws2['I'+str(i)].number_format = '#,##0'
 
-        wb.save('/mount/src/billing/{customer_name}_{month}월_스마트링크내역서.xlsx')
+        wb.save(f'{customer_name}_{month}월_스마트링크내역서.xlsx')
         st.write('청구내역서 생성완료')
 
 else:
