@@ -285,8 +285,10 @@ if customer_file is not None:
             ws2['M'+str(i)].border = border
             ws2['I'+str(i)].number_format = '#,##0'
 
-        wb.save('/Users/wonsuk/Data/output/smartlink_billing.xlsx')
+        wb.save('smartlink.xlsx')
         st.write('청구내역서 생성완료')
+        file = b'smartlink.xlsx'
+        st.download_button('Download excel file', file)
 
 else:
     st.warning('엑셀파일을 업로드 하세요')
