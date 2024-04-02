@@ -287,8 +287,8 @@ if customer_file is not None:
 
         wb.save('smartlink.xlsx')
         st.write('청구내역서 생성완료')
-        file = b'smartlink.xlsx'
-        st.download_button('Download excel file', file)
+        file = 'smartlink.xlsx'
+        st.download_button('Download excel file', data=file)
 
 else:
     st.warning('엑셀파일을 업로드 하세요')
