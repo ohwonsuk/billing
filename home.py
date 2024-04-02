@@ -285,7 +285,7 @@ if customer_file is not None:
             ws2['M'+str(i)].border = border
             ws2['I'+str(i)].number_format = '#,##0'
 
-        wb.save(f'/Users/wonsuk/Data/output/{customer_name}_{month}_smartlink_billing.xlsx')
+        wb.save('/Users/wonsuk/Data/output/smartlink_billing.xlsx')
         st.write('청구내역서 생성완료')
 
 else:
