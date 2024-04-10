@@ -68,11 +68,11 @@ def service_name(service):
 
 # 이용료 누락 차량에 이용료 추가
 def no_fare(service, price1, price2):
-    print(service[0], service[1])
-    if service[1] == 0.0:
-        print(service[1])
+    # print(service[0], service[1])
+    if (service[1] == 0.0) or (pd.isnull(service[1])):
+        # print(service[1])
         if service[0] == '차량운행관리':
-            print(price1)
+            # print(price1)
             return price1
         else:
             return price2
@@ -90,13 +90,19 @@ def sims():
     sims_raw=pd.read_excel("billing_car.xlsx")
     sims_raw['서비스1'] = sims_raw['서비스1'].fillna('-')
     sims_raw['equipnam2'] = sims_raw['equipnam2'].fillna('-')
-    with st.expander("청구대상 차량리스트"):
-        st.dataframe(sims_raw)
-
     sims_raw['차량번호(clean)'] = sims_raw['차량번호'].apply(carnoclean)
     sims_raw['서비스명'] = sims_raw[['서비스1', 'equipnam2']].apply(service_name, axis=1)
     sims_raw['장착일'] = sims_raw['장착일'].apply(pd.to_datetime)
     return sims_raw
+
+def write_dataframe_to_excel(df, row, start_row, start_col):
+    rows = list(dataframe_to_rows(df, index=False, header=False))
+    for r_idx, row in enumerate(rows, start_row):
+        for c_idx, value in enumerate(row, start_col):
+            cell = wb['이용료'].cell(row = r_idx, column = c_idx, value = value)
+            cell.border = border
+            cell.font = font
+            cell.alignment = Alignment(horizontal='center', vertical='center')
 
 
 customer_file = st.file_uploader('#### 청구고객사 엑셀파일을 업로드하세요 ####')
@@ -121,23 +127,6 @@ if customer_file is not None:
     customer=pd.read_excel("customer_name.xlsx")
     st.write('고객사 수 ', customer_count, ' 개사')
 
-    customer_name = st.selectbox(
-        '고객사를 선택하세요',
-        (customer))
-
-    customer_bill = customer_list[customer_list['CMS고객사명'] == customer_name]
-    customer_bill_name = customer_bill.iloc[0,2]  #청구서용 법인명 불러오기
-    customer_code = customer_bill.iloc[0,9]    #사업자번호 불러오기
-    customer_account = customer_bill.iloc[0,17] #계좌번호 불러오기
-    card_use = customer_bill.iloc[0,28]   #하나카드 사용여부
-    bill_month = customer_bill.iloc[0,26]
-            # 고객사 서비스별 단가 매칭 
-    company_data = list(dataframe_to_rows(customer_bill, index=False, header=False))
-    price1 = company_data[0][19]  # 차량운행관리
-    price2 = company_data[0][21]  # 카셰어링프리미엄
-    print('이용료',company_data)
-
-    st.write('청구고객사명:',customer_name, ', 사업자등록번호:',customer_code, ', 계좌번호:',customer_account, ', 청구기준:', bill_month, ', 하나카드사용:', card_use)
     # 청구기준일, 해당월 종료일, 해당월 날짜기간
     start_date = st.date_input('##### 청구기준일자 입력 #####', value=None)
     bill_date = st.date_input('##### 청구서 작성일 입력 #####', datetime.now())
@@ -152,141 +141,272 @@ if customer_file is not None:
         year = start_date.year
         year_month = start_date.strftime("%Y%m")
 
-    if st.button('청구대상 차량 불러오기'):
-        sims_raw = sims()
-        sims_customer = sims_raw.loc[(sims_raw['고객명'] == customer_name) & (sims_raw['장착일'] <= end_date)]
-        columns = ['차량번호(clean)', '차종', '서비스명', '단가1', '장착일']
-        customer_car = sims_customer[columns]
-    # 청구 고객사 차량 리스트 추출
-    # if st.button('고객사 차량 불러오기'):
-    # sims_customer = sims_raw.loc[sims_raw['고객명'] == customer_name]
-        st.write(customer_name, ' 차량리스트')
-        st.dataframe(sims_customer)
-        st.write('청구내역서 항목')
-        st.dataframe(customer_car)
+        select = st.selectbox(
+            '청구내역서 개별 또는 전체 생성 선택하세요',
+            ('개별', '전체'),index=None, placeholder='방법을 선택하기')
 
+        if select == '개별':
+            customer_name = st.selectbox(
+                '고객사를 선택하세요',
+                (customer))
 
-        #CMS 데이터 기준 서비스 미사용 차량 조회 (월별로 사전에 생성)
-        cms_raw = pd.read_excel(f"cms_off_list_({year_month}).xlsx")
-        car_off = cms_raw.loc[cms_raw['고객사'] == customer_name]
-        car_off['종료일'] = car_off['종료일자'].dt.strftime("%Y-%m-%d")
-        #청구 고객사 정보와 차량 매칭
-        car_off_merge = pd.merge(car_off, customer_bill, left_on='고객사', right_on='CMS고객사명', how='left')
-        columns = ['차량번호(clean)','모델','서비스명1', '단가1', '종료일']
-        car_off_list = car_off_merge[columns]
-        #종료 차량 조회
-        st.write('##### 종료차량 조회 #####')
-        st.dataframe(car_off_list)
+            customer_bill = customer_list[customer_list['CMS고객사명'] == customer_name]
+            customer_bill_name = customer_bill.iloc[0,2]  #청구서용 법인명 불러오기
+            customer_code = customer_bill.iloc[0,9]    #사업자번호 불러오기
+            customer_account = customer_bill.iloc[0,17] #계좌번호 불러오기
+            card_use = customer_bill.iloc[0,28]   #하나카드 사용여부
+            bill_month = customer_bill.iloc[0,26]
+                    # 고객사 서비스별 단가 매칭 
+            company_data = list(dataframe_to_rows(customer_bill, index=False, header=False))
+            price1 = company_data[0][19]  # 차량운행관리
+            price2 = company_data[0][21]  # 카셰어링프리미엄
+            print('이용료',company_data)
 
-        # 청구 데이터 생성
-        customer_car['단말기상태'] = '이용'
-        customer_car['계약기간'] = '-'
+            st.write('청구고객사명:',customer_name, ', 사업자등록번호:',customer_code, ', 계좌번호:',customer_account, ', 청구기준:', bill_month, ', 하나카드사용:', card_use)
 
+            if st.button('청구대상 차량 불러오기'):
+                sims_raw = sims()
+                with st.expander("청구대상 차량리스트"):
+                    st.dataframe(sims_raw)
+                sims_customer = sims_raw.loc[(sims_raw['고객명'] == customer_name) & (sims_raw['장착일'] <= end_date)]
+                columns = ['차량번호(clean)', '차종', '서비스명', '단가1', '장착일']
+                customer_car = sims_customer[columns]
+            # 청구 고객사 차량 리스트 추출
+            # if st.button('고객사 차량 불러오기'):
+            # sims_customer = sims_raw.loc[sims_raw['고객명'] == customer_name]
+                st.write(customer_name, ' 차량리스트')
+                st.dataframe(sims_customer)
+                st.write('청구내역서 항목')
+                st.dataframe(customer_car)
 
-        s_date = pd.Timestamp(start_date)
-        start_date_str = start_date.strftime('%Y-%m-%d')
-        customer_car['이용시작'] = customer_car['장착일'].apply(service_start, s_date =s_date)
-        customer_car['이용시작'] = customer_car['이용시작'].dt.strftime("%Y-%m-%d")
-        # 말일 날짜 계산 (1개월 더해서 1일 빼기)
-        customer_car['이용종료'] = end_date
-        customer_car.reset_index(drop=True, inplace=True)
-        # 이용료 누락 차량 단가 채우기
-        customer_car['단가1'] = customer_car[['서비스명', '단가1']].apply(no_fare, args=(price1, price2), axis=1)
-        # st.dataframe(customer_car)
-        # 청구대상 차량대수
-        number_of_list = customer_car['차량번호(clean)'].count()
-        # 종료차량 청구대상에 추가하기
-        append_data = list(dataframe_to_rows(car_off_list, index=False, header=False))
-        for r_idx, row in enumerate(append_data):
-            customer_car.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', start_date_str, row[4]]
+                #CMS 데이터 기준 서비스 미사용 차량 조회 (월별로 사전에 생성)
+                cms_raw = pd.read_excel(f"cms_off_list_({year_month}).xlsx")
+                car_off = cms_raw.loc[cms_raw['고객사'] == customer_name]
+                car_off['종료일'] = car_off['종료일자'].dt.strftime("%Y-%m-%d")
+                #청구 고객사 정보와 차량 매칭
+                car_off_merge = pd.merge(car_off, customer_bill, left_on='고객사', right_on='CMS고객사명', how='left')
+                columns = ['차량번호(clean)','모델','서비스명1', '단가1', '종료일']
+                car_off_list = car_off_merge[columns]
+                #종료 차량 조회
+                st.write('##### 종료차량 조회 #####')
+                st.dataframe(car_off_list)
 
-        #청구대상 기산 산정
-        customer_car['start']=pd.to_datetime(customer_car['이용시작'])
-        customer_car['end']=pd.to_datetime(customer_car['이용종료'])
-        customer_car['gap']= customer_car['end'] - customer_car['start']
-        customer_car['gap'] = customer_car['gap'].dt.days
+                # 청구 데이터 생성
+                customer_car['단말기상태'] = '이용'
+                customer_car['계약기간'] = '-'
 
-        # 단가 일할 계산 (신규장착 - 장착일이 이용시작 이후 발생)
-        customer_car['공급가액'] = round((customer_car['단가1'] / full_day) * customer_car['gap'],-1)
-        #청구양식 만들기
-        columns = ['차량번호(clean)', '차종','서비스명','단말기상태','계약기간','이용시작', '이용종료', '공급가액']
-        car_list = customer_car[columns]
-        car_list.columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액']
-        car_sort = car_list.sort_values(by=['공급가액'])
-        # 청구대상 대수 확정
-        row = car_list['차량번호'].count()
+                s_date = pd.Timestamp(start_date)
+                start_date_str = start_date.strftime('%Y-%m-%d')
+                customer_car['이용시작'] = customer_car['장착일'].apply(service_start, s_date =s_date)
+                customer_car['이용시작'] = customer_car['이용시작'].dt.strftime("%Y-%m-%d")
+                # 말일 날짜 계산 (1개월 더해서 1일 빼기)
+                customer_car['이용종료'] = end_date
+                customer_car.reset_index(drop=True, inplace=True)
+                # 이용료 누락 차량 단가 채우기
+                customer_car['단가1'] = customer_car[['서비스명', '단가1']].apply(no_fare, args=(price1, price2), axis=1)
+                # st.dataframe(customer_car)
+                # 청구대상 차량대수
+                number_of_list = customer_car['차량번호(clean)'].count()
+                # 종료차량 청구대상에 추가하기
+                append_data = list(dataframe_to_rows(car_off_list, index=False, header=False))
+                for r_idx, row in enumerate(append_data):
+                    customer_car.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', start_date_str, row[4]]
 
-        st.write(customer_name," 청구리스트")
-        st.dataframe(car_sort) 
-        # st.data_editor(car_sort, num_rows="dynamic")
+                #청구대상 기산 산정
+                customer_car['start']=pd.to_datetime(customer_car['이용시작'])
+                customer_car['end']=pd.to_datetime(customer_car['이용종료'])
+                customer_car['gap']= customer_car['end'] - customer_car['start']
+                customer_car['gap'] = customer_car['gap'].dt.days
 
-        #청구내역서 엑셀 저장하기
-        # if st.button('청구내역서 만들기'):
-    #   st.write('청구내역서 만들기')
-        path = os.path.realpath(__file__)
-        wb = (load_workbook('basic-form.xlsx') if card_use != 'Y' else load_workbook('card-form.xlsx'))
-        # 청구서 표지 만들기
-        #   st.write('청구표지 만들기')
-        ws1 = wb['청구서']
-        # print(ws1['E15'].value)
-        # print(ws1['G15'].value)
-        # print(ws1['I23'].value)
-        ws1['B4'].value = customer_bill_name  #고객사명
-        ws1['B6'].value = f'{month}월 이용대금 청구서'
-        ws1['O1'].value = bill_date  #청구서작성일자
-        if card_use == 'N':
-            ws1['I23'].value = customer_account   #계좌번호
+                # 단가 일할 계산 (신규장착 - 장착일이 이용시작 이후 발생)
+                customer_car['공급가액'] = round((customer_car['단가1'] / full_day) * customer_car['gap'],-1)
+                #청구양식 만들기
+                columns = ['차량번호(clean)', '차종','서비스명','단말기상태','계약기간','이용시작', '이용종료', '공급가액']
+                car_list = customer_car[columns]
+                car_list.columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액']
+                car_sort = car_list.sort_values(by=['공급가액'])
+                # 청구대상 대수 확정
+                row = car_list['차량번호'].count()
+
+                st.write(customer_name," 청구리스트")
+                st.dataframe(car_sort) 
+                # st.data_editor(car_sort, num_rows="dynamic")
+
+                wb = (load_workbook('basic-form.xlsx') if card_use != 'Y' else load_workbook('card-form.xlsx'))
+                # 청구서 표지 만들기
+                #   st.write('청구표지 만들기')
+                ws1 = wb['청구서']
+                # print(ws1['E15'].value)
+                # print(ws1['G15'].value)
+                # print(ws1['I23'].value)
+                ws1['B4'].value = customer_bill_name  #고객사명
+                ws1['B6'].value = f'{month}월 이용대금 청구서'
+                ws1['O1'].value = bill_date  #청구서작성일자
+                if card_use == 'N':
+                    ws1['I23'].value = customer_account   #계좌번호
+                else:
+                    ws1['I29'].value = customer_account   #계좌번호
+
+                # 이용료 내역 만들기
+                ws2 = wb['이용료']
+                ws2['B2'].value = f'{year}년 {month}월' 
+                ws2['B4'].value = customer_code      #사업자등록번호
+                ws2['C4'].value = customer_bill_name  #고객사명
+                # 카드상세 내역 만들기
+                if card_use == 'Y':
+                    ws3 = wb['카드상세내역']
+                    if month != 1:
+                        ws3['B2'].value = f'{year}년 {month-1}월' 
+                    else:
+                        ws3['B2'].value = f'{year-1}년 {month+11}월' 
+
+                # 스타일 지정
+                border = openpyxl.styles.Border(left=openpyxl.styles.Side(style='thin'), 
+                                                right=openpyxl.styles.Side(style='thin'), 
+                                                top=openpyxl.styles.Side(style='thin'), 
+                                                bottom=openpyxl.styles.Side(style='thin'))
+                font = openpyxl.styles.Font(name='맑은고딕', size=9)
+
+                write_dataframe_to_excel(car_sort, row-1, 6, 2)
+                for i in range(6, 6+row):
+                    ws2['I'+str(i)].alignment = Alignment(horizontal='right', vertical='center')
+                    ws2['J'+str(i)] = "=round(I"+str(i)+"*0.1,0)"
+                    ws2['J'+str(i)].number_format = '#,##0'
+                    ws2['J'+str(i)].border = border
+                    ws2['J'+str(i)].font = font
+                    ws2['K'+str(i)] = "=I"+str(i)+"+J"+str(i)
+                    ws2['K'+str(i)].number_format = '#,##0'
+                    ws2['K'+str(i)].border = border
+                    ws2['K'+str(i)].font = font
+                    ws2['L'+str(i)].border = border
+                    ws2['M'+str(i)].border = border
+                    ws2['I'+str(i)].number_format = '#,##0'
+
+                wb.save(f'/Users/wonsuk/Documents/streamlit/billing/output/{customer_name}_{month}월_스마트링크내역서.xlsx')
+                st.write('청구내역서 생성완료')
         else:
-            ws1['I29'].value = customer_account   #계좌번호
-        # ws1['I23'].value = customer_account   #계좌번호
-        #   st.write(customer_account)
+            if select == '전체':
+                print('고객사리스트', type(customer), customer)
+                if st.button('청구내역서 만들기'):
+                    customers = customer.values.tolist()
+                    for name in customers:
+                        print(name)
+                        customer_bill = customer_list[customer_list['CMS고객사명'] == name[0]]
+                        print('bill-',customer_bill)
+                        customer_bill_name = customer_bill.iloc[0,2]  #청구서용 법인명 불러오기
+                        customer_code = customer_bill.iloc[0,9]    #사업자번호 불러오기
+                        customer_account = customer_bill.iloc[0,17] #계좌번호 불러오기
+                        card_use = customer_bill.iloc[0,28]   #하나카드 사용여부
+                        bill_month = customer_bill.iloc[0,26]
+                        company_data = list(dataframe_to_rows(customer_bill, index=False, header=False))
+                        price1 = company_data[0][19]  # 차량운행관리
+                        price2 = company_data[0][21]  # 카셰어링프리미엄
+                        end_date = (start_date + relativedelta(months=1)- timedelta(days=1)).strftime('%Y-%m-%d')
+                        # full_day
+                        full_day = (datetime.strptime(end_date, '%Y-%m-%d').date() - start_date).days
+                        #청구월, 연도, 연월 계산
+                        month = start_date.month
+                        year = start_date.year
+                        year_month = start_date.strftime("%Y%m")
+                        sims_raw = sims()
+                        sims_customer = sims_raw.loc[(sims_raw['고객명'] == name[0]) & (sims_raw['장착일'] <= end_date)]
+                        columns = ['차량번호(clean)', '차종', '서비스명', '단가1', '장착일']
+                        customer_car = sims_customer[columns]
+                        cms_raw = pd.read_excel(f"cms_off_list_({year_month}).xlsx")
+                        car_off = cms_raw.loc[cms_raw['고객사'] == name[0]]
+                        car_off['종료일'] = car_off['종료일자'].dt.strftime("%Y-%m-%d")
+                        #청구 고객사 정보와 차량 매칭
+                        car_off_merge = pd.merge(car_off, customer_bill, left_on='고객사', right_on='CMS고객사명', how='left')
+                        columns = ['차량번호(clean)','모델','서비스명1', '단가1', '종료일']
+                        car_off_list = car_off_merge[columns]
+                        #종료 차량 조회
+                        # st.write('##### 종료차량 조회 #####')
+                        # st.dataframe(car_off_list)
+                        # 청구 데이터 생성
+                        customer_car['단말기상태'] = '이용'
+                        customer_car['계약기간'] = '-'
+                        s_date = pd.Timestamp(start_date)
+                        start_date_str = start_date.strftime('%Y-%m-%d')
+                        customer_car['이용시작'] = customer_car['장착일'].apply(service_start, s_date =s_date)
+                        customer_car['이용시작'] = customer_car['이용시작'].dt.strftime("%Y-%m-%d")
+                        # 말일 날짜 계산 (1개월 더해서 1일 빼기)
+                        customer_car['이용종료'] = end_date
+                        customer_car.reset_index(drop=True, inplace=True)
+                        # 이용료 누락 차량 단가 채우기
+                        customer_car['단가1'] = customer_car[['서비스명', '단가1']].apply(no_fare, args=(price1, price2), axis=1)
+                        # st.dataframe(customer_car)
+                        # 청구대상 차량대수
+                        number_of_list = customer_car['차량번호(clean)'].count()
+                        # 종료차량 청구대상에 추가하기
+                        append_data = list(dataframe_to_rows(car_off_list, index=False, header=False))
+                        for r_idx, row in enumerate(append_data):
+                            customer_car.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', start_date_str, row[4]]
+                        #청구대상 기산 산정
+                        customer_car['start']=pd.to_datetime(customer_car['이용시작'])
+                        customer_car['end']=pd.to_datetime(customer_car['이용종료'])
+                        customer_car['gap']= customer_car['end'] - customer_car['start']
+                        customer_car['gap'] = customer_car['gap'].dt.days
+                        # 단가 일할 계산 (신규장착 - 장착일이 이용시작 이후 발생)
+                        customer_car['공급가액'] = round((customer_car['단가1'] / full_day) * customer_car['gap'],-1)
+                        #청구양식 만들기
+                        columns = ['차량번호(clean)', '차종','서비스명','단말기상태','계약기간','이용시작', '이용종료', '공급가액']
+                        car_list = customer_car[columns]
+                        car_list.columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액']
+                        car_sort = car_list.sort_values(by=['공급가액'])
+                        # 청구대상 대수 확정
+                        row = car_list['차량번호'].count()
+                        # st.write(customer_name," 청구리스트")
+                        # st.dataframe(car_sort) 
+                        # st.data_editor(car_sort, num_rows="dynamic")
+                        wb = (load_workbook('basic-form.xlsx') if card_use != 'Y' else load_workbook('card-form.xlsx'))
+                        # 청구서 표지 만들기
+                        #   st.write('청구표지 만들기')
+                        ws1 = wb['청구서']
+                        # print(ws1['E15'].value)
+                        # print(ws1['G15'].value)
+                        # print(ws1['I23'].value)
+                        ws1['B4'].value = customer_bill_name  #고객사명
+                        ws1['B6'].value = f'{month}월 이용대금 청구서'
+                        ws1['O1'].value = bill_date  #청구서작성일자
+                        if card_use == 'N':
+                            ws1['I23'].value = customer_account   #계좌번호
+                        else:
+                            ws1['I29'].value = customer_account   #계좌번호
+                        # 이용료 내역 만들기
+                        ws2 = wb['이용료']
+                        ws2['B2'].value = f'{year}년 {month}월' 
+                        ws2['B4'].value = customer_code      #사업자등록번호
+                        ws2['C4'].value = customer_bill_name  #고객사명
+                        # 카드상세 내역 만들기
+                        if card_use == 'Y':
+                            ws3 = wb['카드상세내역']
+                            if month != 1:
+                                ws3['B2'].value = f'{year}년 {month-1}월' 
+                            else:
+                                ws3['B2'].value = f'{year-1}년 {month+11}월' 
+                        # 스타일 지정
+                        border = openpyxl.styles.Border(left=openpyxl.styles.Side(style='thin'), 
+                                                        right=openpyxl.styles.Side(style='thin'), 
+                                                        top=openpyxl.styles.Side(style='thin'), 
+                                                        bottom=openpyxl.styles.Side(style='thin'))
+                        font = openpyxl.styles.Font(name='맑은고딕', size=9)
+                        write_dataframe_to_excel(car_sort, row-1, 6, 2)
+                        for i in range(6, 6+row):
+                            ws2['I'+str(i)].alignment = Alignment(horizontal='right', vertical='center')
+                            ws2['J'+str(i)] = "=round(I"+str(i)+"*0.1,0)"
+                            ws2['J'+str(i)].number_format = '#,##0'
+                            ws2['J'+str(i)].border = border
+                            ws2['J'+str(i)].font = font
+                            ws2['K'+str(i)] = "=I"+str(i)+"+J"+str(i)
+                            ws2['K'+str(i)].number_format = '#,##0'
+                            ws2['K'+str(i)].border = border
+                            ws2['K'+str(i)].font = font
+                            ws2['L'+str(i)].border = border
+                            ws2['M'+str(i)].border = border
+                            ws2['I'+str(i)].number_format = '#,##0'
+                        wb.save(f'/Users/wonsuk/Documents/streamlit/billing/output/{name[0]}_{month}월_스마트링크내역서.xlsx')
+                        st.write(name[0],'-청구내역서 생성완료')
 
-        # 이용료 내역 만들기
-        ws2 = wb['이용료']
-        ws2['B2'].value = f'{year}년 {month}월' 
-        ws2['B4'].value = customer_code      #사업자등록번호
-        ws2['C4'].value = customer_bill_name  #고객사명
-        # 카드상세 내역 만들기
-        if card_use == 'Y':
-            ws3 = wb['카드상세내역']
-            if month != 1:
-                ws3['B2'].value = f'{year}년 {month-1}월' 
-            else:
-                ws3['B2'].value = f'{year-1}년 {month+11}월' 
-
-        # 스타일 지정
-        border = openpyxl.styles.Border(left=openpyxl.styles.Side(style='thin'), 
-                                        right=openpyxl.styles.Side(style='thin'), 
-                                        top=openpyxl.styles.Side(style='thin'), 
-                                        bottom=openpyxl.styles.Side(style='thin'))
-        font = openpyxl.styles.Font(name='맑은고딕', size=9)
-
-        def write_dataframe_to_excel(df, row, start_row, start_col):
-            rows = list(dataframe_to_rows(df, index=False, header=False))
-            for r_idx, row in enumerate(rows, start_row):
-                for c_idx, value in enumerate(row, start_col):
-                    cell = wb['이용료'].cell(row = r_idx, column = c_idx, value = value)
-                    cell.border = border
-                    cell.font = font
-                    cell.alignment = Alignment(horizontal='center', vertical='center')
-        
-        write_dataframe_to_excel(car_sort, row-1, 6, 2)
-        for i in range(6, 6+row):
-            ws2['I'+str(i)].alignment = Alignment(horizontal='right', vertical='center')
-            ws2['J'+str(i)] = "=round(I"+str(i)+"*0.1,0)"
-            ws2['J'+str(i)].number_format = '#,##0'
-            ws2['J'+str(i)].border = border
-            ws2['J'+str(i)].font = font
-            ws2['K'+str(i)] = "=I"+str(i)+"+J"+str(i)
-            ws2['K'+str(i)].number_format = '#,##0'
-            ws2['K'+str(i)].border = border
-            ws2['K'+str(i)].font = font
-            ws2['L'+str(i)].border = border
-            ws2['M'+str(i)].border = border
-            ws2['I'+str(i)].number_format = '#,##0'
-
-        wb.save(f'{customer_name}_{month}월_스마트링크내역서.xlsx')
-        st.write('청구내역서 생성완료')
 
 else:
     st.warning('엑셀파일을 업로드 하세요')
