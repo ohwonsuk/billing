@@ -205,6 +205,7 @@ if customer_file is not None:
             bill_month = customer_bill.iloc[0,27] #당월, 전월 구분
             card_percent = customer_bill.iloc[0,25] #카드 수수료 구분
             vat_include = customer_bill.iloc[0,29] #부가세 포함여부 (포함 = 'Y')
+            tax_free = customer_bill.iloc[0,28] #공제차량 표출여부 (포함 = 'Y')
             service1 = customer_bill.iloc[0,19] #서비스명1 불러오기
             service2 = customer_bill.iloc[0,21] #서비스명2 불러오기
             print('서비스명-',service1)
@@ -219,14 +220,16 @@ if customer_file is not None:
             price2 = company_data[0][22]  # 카셰어링프리미엄
             print('이용료',company_data)
 
-            st.write('청구고객사명:',customer_bill_name, ', 사업자등록번호:',customer_code, ', 계좌번호:',customer_account, ', 청구기준:', bill_month, ', 하나카드사용:', card_use, ', 카드수수료:', card_percent)
+            st.write('청구고객사명:',customer_bill_name, ', 사업자등록번호:',customer_code, ', 계좌번호:',customer_account, ', 청구기준:', bill_month, ', 하나카드사용:', card_use, ', 카드수수료:', card_percent, ', 면세구분:', tax_free)
 
             if st.button('청구대상 차량 불러오기'):
                 sims_raw = sims()
                 with st.expander("청구대상 차량리스트"):
                     st.dataframe(sims_raw)
-                sims_customer = sims_raw.loc[(sims_raw['고객명'] == customer_name) & (sims_raw['장착일'] <= end_date)]
-                columns = ['차량번호(clean)', '차종', '서비스명', '단가1', '장착일']
+                sims_customer1 = sims_raw.loc[(sims_raw['고객명'] == customer_name) & (sims_raw['장착일'] <= end_date)]
+                sims_customer2 = sims_raw.loc[(sims_raw['고객명'] == customer_name) & (sims_raw['장착일'].isnull())]
+                sims_customer = pd.concat([sims_customer1, sims_customer2])
+                columns = ['차량번호(clean)', '차종', '서비스명', '단가1', '장착일', '면세여부']
                 customer_car = sims_customer[columns]
             # 청구 고객사 차량 리스트 추출
             # if st.button('고객사 차량 불러오기'):
@@ -270,6 +273,7 @@ if customer_file is not None:
                 # 청구 데이터 생성
                 customer_car['단말기상태'] = '이용'
                 customer_car['계약기간'] = '-'
+                customer_car['차종'] = customer_car['차종'].fillna('-')
 
                 # s_date = pd.Timestamp(start_date)
                 # start_date_str = start_date.strftime('%Y-%m-%d')
@@ -289,13 +293,16 @@ if customer_file is not None:
                 # st.dataframe(customer_car)
                 # 청구대상 차량대수
                 number_of_list = customer_car['차량번호(clean)'].count()
+                print('차량대수',number_of_list)
                 # 종료차량 청구대상에 추가하기
                 append_data = list(dataframe_to_rows(car_off_list, index=False, header=False))
+                print('탈거차량', append_data)
                 for r_idx, row in enumerate(append_data):
                             if pd.to_datetime(row[4]) >  pd.to_datetime(start_date):
-                                customer_car_filter.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', start_date.strftime('%Y-%m-%d'), row[4]]
+                                print(row[4])
+                                customer_car_filter.loc[number_of_list + r_idx + 1] = [row[0], row[1], row[2], row[3], row[4], 0, '반납', '-', start_date.strftime('%Y-%m-%d'), row[4]]
                             else:
-                                customer_car_filter.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', row[4], end_pdate]
+                                customer_car_filter.loc[number_of_list + r_idx + 1] = [row[0], row[1], row[2], row[3], row[4], 0, '반납', '-', row[4], end_pdate]
 
                 #청구대상 기산 산정
                 customer_car_filter['start']=pd.to_datetime(customer_car_filter['이용시작'])
@@ -306,10 +313,21 @@ if customer_file is not None:
                 # 단가 일할 계산 (신규장착 - 장착일이 이용시작 이후 발생)
                 customer_car_filter['공급가액'] = customer_car_filter[['단가1', 'gap', 'end']].apply(price_cal, args=[pd.to_datetime(start_date), full_day, full_pday, price1, vat_include], axis=1)
                 #청구양식 만들기
-                columns = ['차량번호(clean)', '차종','서비스명','단말기상태','계약기간','이용시작', '이용종료', '공급가액']
+                columns = ['차량번호(clean)', '차종','서비스명','단말기상태','계약기간','이용시작', '이용종료', '공급가액', '면세여부']
                 car_list = customer_car_filter[columns]
-                car_list.columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액']
-                car_sort = car_list.sort_values(by=['단말기상태' ,'공급가액'])
+                car_list.columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액', '비고']
+                car_list_sort = car_list.sort_values(by=['비고', '단말기상태' ,'공급가액'])
+
+                # 면세차량 있는 고객사만 면세여부 필드 분리 및 불공제/공제 로 변경
+                if tax_free == 'Y':
+                    tax_car = car_list_sort['비고'].to_list()
+                    tax_car = ['공제' if x == 1 else '불공제' for x in tax_car]
+                else:
+                    tax_car =[]
+
+                columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액']
+                car_sort = car_list_sort[columns]
+
                 # 청구대상 대수 확정
                 row = car_list['차량번호'].count()
                 card_filename = 'card-form1.xlsx' if card_percent == 0.01 else 'card-form2.xlsx'
@@ -345,7 +363,13 @@ if customer_file is not None:
                     ws2['K'+str(i)].font = font
                     ws2['L'+str(i)].border = border
                     ws2['M'+str(i)].border = border
+                    ws2['M'+str(i)].font = font
+                    ws2['M'+str(i)].alignment = Alignment(horizontal='center', vertical='center')
                     ws2['I'+str(i)].number_format = '#,##0'
+
+                if len(tax_car) > 0:
+                    for c_idx, value in enumerate(tax_car, 6):
+                        ws2['M'+str(c_idx)] = value  
 
                 # 카드상세 내역 만들기
                 if card_use == 'Y':
@@ -391,6 +415,7 @@ if customer_file is not None:
                         bill_month = customer_bill.iloc[0,27]  #당월, 전월 기준
                         card_percent = customer_bill.iloc[0,25] #카드수수료
                         vat_include = customer_bill.iloc[0,29] #부가세 포함여부 (포함 = 'Y')
+                        tax_free = customer_bill.iloc[0,28] #공제차량 표출여부 (포함 = 'Y')
                         service1 = customer_bill.iloc[0,19] #서비스명1 불러오기
                         service2 = customer_bill.iloc[0,21] #서비스명2 불러오기
                         print('서비스명-',service1)
@@ -411,7 +436,7 @@ if customer_file is not None:
                         # year_month = start_date.strftime("%Y%m")
                         sims_raw = sims()
                         sims_customer = sims_raw.loc[(sims_raw['고객명'] == name) & (sims_raw['장착일'] <= end_date)]
-                        columns = ['차량번호(clean)', '차종', '서비스명', '단가1', '장착일']
+                        columns = ['차량번호(clean)', '차종', '서비스명', '단가1', '장착일', '면세여부']
                         customer_car = sims_customer[columns]
 
                         #CMS 데이터 기준 서비스 미사용 차량 조회 (월별로 사전에 생성)
@@ -471,9 +496,9 @@ if customer_file is not None:
                         append_data = list(dataframe_to_rows(car_off_list, index=False, header=False))
                         for r_idx, row in enumerate(append_data):
                                     if pd.to_datetime(row[4]) > pd.to_datetime(start_date):
-                                        customer_car_filter.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', start_date.strftime('%Y-%m-%d'), row[4]]
+                                        customer_car_filter.loc[number_of_list + r_idx + 1] = [row[0], row[1], row[2], row[3], row[4], 0, '반납', '-', start_date.strftime('%Y-%m-%d'), row[4]]
                                     else:
-                                        customer_car_filter.loc[number_of_list + r_idx] = [row[0], row[1], row[2], row[3], row[4], '반납', '-', row[4], end_pdate]
+                                        customer_car_filter.loc[number_of_list + r_idx + 1] = [row[0], row[1], row[2], row[3], row[4], 0, '반납', '-', row[4], end_pdate]
 
                         #청구대상 기산 산정
                         customer_car_filter['start']=pd.to_datetime(customer_car_filter['이용시작'])
@@ -483,11 +508,23 @@ if customer_file is not None:
 
                         # 단가 일할 계산 (신규장착 - 장착일이 이용시작 이후 발생)
                         customer_car_filter['공급가액'] = customer_car_filter[['단가1', 'gap', 'end']].apply(price_cal, args=[pd.to_datetime(start_date), full_day, full_pday, price1, vat_include], axis=1)
+
                         #청구양식 만들기
-                        columns = ['차량번호(clean)', '차종','서비스명','단말기상태','계약기간','이용시작', '이용종료', '공급가액']
+                        columns = ['차량번호(clean)', '차종','서비스명','단말기상태','계약기간','이용시작', '이용종료', '공급가액', '면세여부']
                         car_list = customer_car_filter[columns]
-                        car_list.columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액']
-                        car_sort = car_list.sort_values(by=['단말기상태' ,'공급가액'])
+                        car_list.columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액', '비고']
+                        car_list_sort = car_list.sort_values(by=['비고', '단말기상태' ,'공급가액'])
+
+                        # 면세차량 있는 고객사만 면세여부 필드 분리 및 불공제/공제 로 변경
+                        if tax_free == 'Y':
+                            tax_car = car_list_sort['비고'].to_list()
+                            tax_car = ['공제' if x == 1 else '불공제' for x in tax_car]
+                        else:
+                            tax_car =[]
+
+                        columns = ['차량번호', '차종', '서비스구분', '단말기상태','계약기간','이용시작', '이용종료', '공급가액']
+                        car_sort = car_list_sort[columns]
+
                         # 청구대상 대수 확정
                         row = car_list['차량번호'].count()
                         card_filename = 'card-form1.xlsx' if card_percent == 0.01 else 'card-form2.xlsx'
@@ -522,7 +559,13 @@ if customer_file is not None:
                             ws2['K'+str(i)].font = font
                             ws2['L'+str(i)].border = border
                             ws2['M'+str(i)].border = border
+                            ws2['M'+str(i)].font = font
+                            ws2['M'+str(i)].alignment = Alignment(horizontal='center', vertical='center')
                             ws2['I'+str(i)].number_format = '#,##0'
+
+                        if len(tax_car) > 0:
+                            for c_idx, value in enumerate(tax_car, 6):
+                                ws2['M'+str(c_idx)] = value  
 
                         # 카드상세 내역 만들기
                         if card_use == 'Y':
@@ -549,10 +592,8 @@ if customer_file is not None:
                         else:
                             ws1['I33'].value = customer_account   #계좌번호
 
-
                         wb.save(f'/Users/wonsuk/Documents/streamlit/billing/output/{customer_bill_name}_{month}월_스마트링크내역서.xlsx')
                         st.write(customer_bill_name,'-청구내역서 생성완료')
-
 
 else:
     st.warning('엑셀파일을 업로드 하세요')
